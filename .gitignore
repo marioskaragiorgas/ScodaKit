@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+
+# Distribution / packaging
+build/
+dist/
+*.egg
+*.egg-info/
+*.whl
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
