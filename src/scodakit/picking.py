@@ -3,7 +3,7 @@
 picking.py
 
 This script allows for manual picking of P and S phases from seismic waveforms.
-It reads .mseed files from a specified folder, applies a bandpass filter,
+It reads seismic files from a specified folder, applies a bandpass filter,
 and displays the waveforms for manual picking. The picked arrival times
 are saved to an Excel file, and the validated waveforms are saved to a specified folder.
 The script uses the ObsPy library for seismic data handling and Matplotlib for plotting.
