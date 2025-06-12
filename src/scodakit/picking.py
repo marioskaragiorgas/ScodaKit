@@ -42,18 +42,23 @@ def pick_phases_from_folder(
     """
     Path(output_waveform_folder).mkdir(parents=True, exist_ok=True)
 
-    mseed_folders = [f for f in os.listdir(input_folder)] # List all folders in the input directory
-    mseed_files = []
+    logging.info(f"Starting phase picking from folder: {input_folder}")
+    if not os.path.exists(input_folder):
+        logging.error(f"Input folder {input_folder} does not exist.")
+        return
+    
+    seismic_files = []
     for root, dirs, files in os.walk(input_folder):
         for file in files:
             if file.endswith('.mseed'):
-                mseed_files.append(os.path.join(root, file))
+                seismic_files.append(os.path.join(root, file))
 
     data_dict = {'Origin time': [], 'P arrival time': [], 'S arrival time': [], 'Network': [], 'Station': []}
 
-    for fname in mseed_files:
+    for fname in seismic_files:
         stream_path = os.path.join(input_folder, fname)
-        st = read(stream_path).copy()
+        format = os.path.splitext(fname)[-1].upper()
+        st = read(stream_path, format).copy()
         trE, trN, trZ = st[0], st[1], st[2]
 
         trE_data = trE.data
