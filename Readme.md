@@ -28,7 +28,7 @@ This command-line pipeline allows you to:
 
 In the seismogram of a local earthquake, we typically observe early-arriving body waves (**P** and **S**) and later surface waves (**Rayleigh** and **Love**). However, in the high-frequency range, seismograms often exhibit **coda waves**: trailing incoherent wave trains that follow the direct P and S-waves.
 
-**S-coda waves** are considered scattered incoherent waves caused by randomly distributed heterogeneities (e.g., cracks, faults, lithological changes). This scattering process transforms the direct energy into a diffuse field whose amplitude decays with time. Coda waves were first formalized by Aki and Chouet (1975) as a tool for quantifying crustal heterogeneity.
+**S-coda waves** are interpreted as scattered incoherent waves caused by randomly distributed heterogeneities (e.g., cracks, faults, lithological changes). This scattering process transforms the direct energy into a diffuse field whose amplitude decays with time. Coda waves were first formalized by Aki and Chouet (1975) as a tool for quantifying crustal heterogeneity.
 
 ---
 
