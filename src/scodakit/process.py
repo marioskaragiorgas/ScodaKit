@@ -336,7 +336,7 @@ def process_event_batch(
             ax.plot(X, Y_pred, color='red')
             ax.set_title(f"F(t) vs t | R² = {r2:.2f}")
             ax.set_xlabel("Lapse Time t (s)")
-            ax.set_ylabel("F(t) [cm]")
+            ax.set_ylabel("F(t)")
             plt.tight_layout()
             fig_path = os.path.join(output_dir, f"{origin.strftime('%Y%m%d_%H%M%S')}_Ft_fit.png")
             fig.savefig(fig_path, dpi=200)
