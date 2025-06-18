@@ -239,7 +239,6 @@ scodakit \
 * obspy
 * pandas
 * matplotlib
-* seaborn
 * scikit-learn
 * cartopy
 * geopandas
@@ -308,8 +307,6 @@ Contributions are welcomne! Feel free to:
 - Scikit-learn for linear regression
 
 - matplotlib for plotting data
-
-- seaborn for advanced statistical data ploting
 
 - ObsPy for seismic waveform handling and processing
 
