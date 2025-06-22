@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scodakit"
-version = "1.0.0"
+version = "0.0.1"
 description = "ScodaKit: A scientific Python-based command line toolkit for S-coda seismic wave analysis and scattering parameters estimation"
 readme = "README.md"
 requires-python = ">=3.7"
