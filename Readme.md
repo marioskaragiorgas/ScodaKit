@@ -181,6 +181,11 @@ Now you can run the pipeline with the command below:
 ```bash
 scodakit --help
 ```
+or
+
+```bash
+scodakit -h
+```
 
 ---
 
