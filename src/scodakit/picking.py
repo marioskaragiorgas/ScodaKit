@@ -3,7 +3,7 @@
 picking.py
 
 This script allows for manual picking of P and S phases from seismic waveforms.
-It reads seismic files from a specified folder, applies a bandpass filter,
+It reads .mseed files from a specified folder, applies a bandpass filter,
 and displays the waveforms for manual picking. The picked arrival times
 are saved to an Excel file, and the validated waveforms are saved to a specified folder.
 The script uses the ObsPy library for seismic data handling and Matplotlib for plotting.
@@ -11,7 +11,6 @@ The script uses the ObsPy library for seismic data handling and Matplotlib for p
 Author: Marios Karagiorgas  
 """
 
-import os
 import logging
 from pathlib import Path
 import pandas as pd
@@ -40,24 +39,23 @@ def pick_phases_from_folder(
     output_waveform_folder : str
         Directory to save validated waveform files.
     """
-    Path(output_waveform_folder).mkdir(parents=True, exist_ok=True)
+    # Ensure the input and output paths are valid
+    input_folder = Path(input_folder)
+    output_path = Path(output_waveform_folder)
+    output_path.mkdir(parents=True, exist_ok=True)
 
     logging.info(f"Starting phase picking from folder: {input_folder}")
-    if not os.path.exists(input_folder):
+    if not input_folder.exists():
         logging.error(f"Input folder {input_folder} does not exist.")
         return
     
-    seismic_files = []
-    for root, dirs, files in os.walk(input_folder):
-        for file in files:
-            if file.endswith('.mseed'):
-                seismic_files.append(os.path.join(root, file))
+    seismic_files = [f for f in input_folder.rglob("*.mseed") if f.is_file()]
 
     data_dict = {'Origin time': [], 'P arrival time': [], 'S arrival time': [], 'Network': [], 'Station': []}
 
     for fname in seismic_files:
-        stream_path = os.path.join(input_folder, fname)
-        format = os.path.splitext(fname)[-1].upper()
+        format = fname.suffix.lstrip('.').upper()  # Get the file format from the extension
+        stream_path = str(fname)
         st = read(stream_path, format).copy()
         trE, trN, trZ = st[0], st[1], st[2]
 
@@ -109,14 +107,17 @@ def pick_phases_from_folder(
 
 
             output_name = f"{trZ.stats.starttime.strftime('%Y-%m-%d-%H-%M-%S')}_{trZ.stats.network}_{trZ.stats.station}.mseed"
+            output_path_full = output_path / output_name
             
             # Apply bandpass filter to the three components and save the validated waveform
             fs = trE.stats.sampling_rate
             trE.filter("bandpass", freqmin=1, freqmax=30, corners=4, zerophase=True)
             trN.filter("bandpass", freqmin=1, freqmax=30, corners=4, zerophase=True)
             trZ.filter("bandpass", freqmin=1, freqmax=30, corners=4, zerophase=True)
-            st.write(os.path.join(output_waveform_folder, output_name), format='MSEED')
-            logging.info(f"Saved validated waveform: {output_name}")
+
+            # Save the validated waveform
+            st.write(str(output_path_full), format='MSEED')
+            logging.info(f"Saved validated waveform: {output_path_full}")
         else:
             logging.warning(f"No picks made for {fname}. Skipping...")
         
