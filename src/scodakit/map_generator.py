@@ -14,6 +14,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from cartopy.io.img_tiles import GoogleTiles
 
 
 def load_data(catalogue_path):
@@ -54,14 +55,15 @@ def load_data(catalogue_path):
     return events_gdf, stations_gdf
 
 def plot_map(events_gdf, stations_gdf, output_dir, image_formats):
-    fig, ax = plt.subplots(figsize=(12, 12), subplot_kw={"projection": ccrs.PlateCarree()})
+    # Add tiles and features
+    tiles = GoogleTiles(style="satellite")
+    fig, ax = plt.subplots(figsize=(12, 12), subplot_kw={'projection': ccrs.PlateCarree()})
+    ax.add_image(tiles, 10, interpolation='bilinear')
     ax.set_title("Seismic Events and Stations")
-
-    ax.add_feature(cfeature.COASTLINE)
-    ax.add_feature(cfeature.BORDERS, linestyle=':')
-    ax.add_feature(cfeature.LAND, facecolor='whitesmoke')
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
     ax.gridlines(draw_labels=True)
-
+    
     stations_gdf.plot(ax=ax, marker="^", color="blue", markersize=60, label="Stations", edgecolor="black", zorder=5)
     events_gdf.plot(ax=ax, marker="o", column="Magnitude (ML)", cmap="Reds", alpha=0.7, legend=True, label="Events", zorder=4)
 
