@@ -28,7 +28,7 @@ This command-line pipeline allows you to:
 
 In the seismogram of a local earthquake, we typically observe early-arriving body waves (**P** and **S**) and later surface waves (**Rayleigh** and **Love**). However, in the high-frequency range, seismograms often exhibit **coda waves**: trailing incoherent wave trains that follow the direct P and S-waves.
 
-**S-coda waves** are interpreted as scattered incoherent waves caused by randomly distributed heterogeneities (e.g., cracks, faults, lithological changes). This scattering process transforms the direct energy into a diffuse field whose amplitude decays with time. Coda waves were first formalized by Aki and Chouet (1975) as a tool for quantifying crustal heterogeneity.
+**S-coda waves** are considered scattered incoherent waves caused by randomly distributed heterogeneities (e.g., cracks, faults, lithological changes). This scattering process transforms the direct energy into a diffuse field whose amplitude decays with time. Coda waves were first formalized by Aki and Chouet (1975) as a tool for quantifying crustal heterogeneity.
 
 ---
 
@@ -163,7 +163,7 @@ scodakit/
 
 # 📦 Installation
 
-## (Optional) create a python virtual environment
+## (Optional) create a python virtual environment. Python >=3.7 needs to be installed first in the system
 
 ```bash
 python -m venv venv
@@ -176,59 +176,220 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install scodakit
 ```
 
-Now you can run the pipeline with the command below:
+Or for developement:
+
+```bash
+git clone https://github.com/marioskaragiorgas/ScodaKit.git
+cd ScodaKit
+pip install -e .
+```
+
+Now you can run the pipeline with either the command below:
 
 ```bash
 scodakit --help
 ```
-or
+Or with: 
 
 ```bash
 scodakit -h
 ```
-
 ---
 
 ---
 
 # 🚀 How to Run
 
+## ⚙️ CLI Flags/Core Commands
+
+| Flag                        | Description                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `-dr` , `--dry_run`         | Dry run mode. Validate arguments and configuration without executing pipeline stages             |
+| `-a` , `--all`              | Run all the stages of the pipeline without parsing the other arguments                           |
+| `-d` , `--download`         | Download waveforms from the FDSN-compliant data centres using earthquakes from a seismic catalog |
+| `-p` , `--pick`             | Launch P and S phase picking interface                                                           |
+| `-me` , `--merge_catalog`   | Match picks with seismic catalog and compute distances                                           |
+| `-ma` , `--map`             | Generate maps of seismic events/stations and their metadata                                      |
+| `-pr` , `--process`         | Process waveforms to extract coda segment and estimate the scaterrimg parameters                 |
+| `-pl` , `--plot`            | Plot waveform and coda traces                                                                    |
+
+---
+
+## Download Options
+
+| Argument            | Description                                                                 |
+|---------------------|-----------------------------------------------------------------------------|
+| `--catalog`         | Seismic event catalog file (`.xml`, `.csv`, `.xlsx`)                        |
+| `--stations`        | List of station codes (e.g., `HL.ATH`)                                      |
+| `--bbox`            | Bounding box (`minlat,minlon,maxlat,maxlon`)                                |
+| `--radius`          | Search radius in km                                                         |
+| `--channels`        | SEED channel pattern (e.g., `HH?`)                                          |
+| `--start_offset`    | Time before origin in seconds                                               |
+| `--end_offset`      | Time after origin in seconds                                                |
+| `--output_format`   | Waveform format (`MSEED`, etc.)                                             |
+| `--node`            | FDSN data node (e.g., `NOA`)                                                |
+| `--network_filter`  | List of allowed network codes                                               |
+| `--threads`         | Number of threads for parallel download                                     |
+
+---
+
+## Map Generation
+
+| Argument            | Description                                                |
+|---------------------|------------------------------------------------------------|
+| `--map_output_dir`  | Output directory for maps                                  |
+| `--image_formats`   | Image formats to export (`png`, `pdf`)                     |
+| `--export_formats`  | Data export formats (`geojson`, `csv`)                     |
+
+---
+
+## General Options
+
+| Argument         | Description                                                    |
+|------------------|----------------------------------------------------------------|
+| `--output_dir`   | Base output directory                                          |
+| `--log`          | Enable logging to `pipeline.log`                               |
+| `--dry_run`      | Validate configuration and exit without running                |
+| `--config`       | Load arguments from JSON or YAML config file                   |
+
+## Visual diagram of the pipeline stages
+
+```Mermaid
+graph TD
+  Start([Start])
+  Start --> ParseArgs[/Parse CLI Arguments or Load Config/]
+  ParseArgs --> CheckDeps{Dependencies OK?}
+  CheckDeps -- No --> ErrorExit[Exit with Error]
+  CheckDeps -- Yes --> Stage1{{Download?}}
+  Stage1 -- Yes --> Download[Download Waveforms]
+  Stage1 -- No --> Skip1[Skip]
+  Download --> Stage2{{Pick?}}
+  Skip1 --> Stage2
+  Stage2 -- Yes --> Pick[Pick P/S Arrivals]
+  Stage2 -- No --> Skip2[Skip]
+  Pick --> Stage3{{Merge Catalog?}}
+  Skip2 --> Stage3
+  Stage3 -- Yes --> Merge[Merge Picks + Catalog]
+  Stage3 -- No --> Skip3[Skip]
+  Merge --> Stage4{{Map?}}
+  Skip3 --> Stage4
+  Stage4 -- Yes --> Map[Generate GIS Maps]
+  Stage4 -- No --> Skip4[Skip]
+  Map --> Stage5{{Process?}}
+  Skip4 --> Stage5
+  Stage5 -- Yes --> Process[Extract S-coda segments and compute Scattering parameters]
+  Stage5 -- No --> Skip5[Skip]
+  Process --> Stage6{{Plot?}}
+  Skip5 --> Stage6
+  Stage6 -- Yes --> Plot[Generate Plots]
+  Stage6 -- No --> Skip6[Skip]
+  Plot --> End([End])
+  Skip6 --> End
+```
+
 ### 🔹 Minimal Example (Single station or multiple stations)
 
 ```bash
-scodakit \
-  --catalog catalog.xml \
-  --stations "ATH" \ # or "ATH", "PTL", "VLY", "THVA"
-  --download --pick --merge_catalog --map --process --plot 
+scodakit --catalog "path/to/your/earthquake_catalog.xml" --output_dir "path/to/your/working/directory" --stations "HL.ATH","HL.PTL","HL.VLY","HL.THVA" --download --pick --merge_catalog --map --process --plot 
 ```
 
-### 🔹 Radius-Based Station Search
+### 🔹 Dynamic Radius-Based Station Search
 
 ```bash
-scodakit \
-  --catalog catalog.csv \
-  --radius 100 \
-  --download --pick --merge_catalog --map --process --plot
+scodakit --catalog "path/to/your/earhquake_catalog.csv" --radius 100 --download --pick --merge_catalog --map --process --plot
 ```
 
-## ⚙️ CLI Flags/Core Commands
+### 🔹 Dynamic Radius-Based Station Search
 
-| Flag                | Description                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------ |
-| `--download`        | Download waveforms from the FDSN-compliant data centres using earthquakes from a seismic catalog |
-| `--pick`            | Launch P and S phase picking interface                                                           |
-| `--merge_catalog`   | Match picks with seismic catalog and compute distances                                           |
-| `--map`             | Generate maps of seismic events/stations and their metadata                                      |
-| `--process`         | Process waveforms to extract coda segment and estimate the scaterrimg parameters                 |
-| `--plot`            | Plot waveform and coda traces                                                                    |
+```bash
+scodakit --catalog "path/to/your/catalog.csv" --bbox '37.5,38.4,23.2,24.2' --output_dir "path/to/your/working/directory" --download --pick --merge_catalog --map --process --plot
+```
+
+### 🔹Other Examples
+```bash
+scodakit -a --catalog "path/to/your/earthquake_catalog.csv" --stations HL.ATH --output_dir "path/to/your/working/directory" --threads 8
+```
+Or using a configuration file containing the appropriate arguments:
+
+```bash
+scodakit --config "path/to/your/config.json"
+```
+The configuration file should look like this example:
+
+```json
+{
+  "all": false,
+  "download": true,
+  "pick": true,
+  "merge_catalog": true,
+  "map": true,
+  "process": true,
+  "plot": true,
+  "catalog": "test_data/seismic_catalogue.csv",
+  "stations": ["HL.ATH", "HL.APR"],
+  "bbox": "37.5,22.5,39.0,24.0",
+  "channels": "HH?",
+  "start_offset": -30,
+  "end_offset": 150,
+  "output_format": "MSEED",
+  "node": "NOA",
+  "network_filter": ["HL"],
+  "threads": 8,
+  "map_output_dir": "maps",
+  "image_formats": ["png", "pdf"],
+  "export_formats": ["geojson", "csv"],
+  "output_dir": "results",
+  "log": true
+}
+```
+
+```yaml
+all: false
+download: true
+pick: true
+merge_catalog: true
+map: true
+process: true
+plot: true
+
+catalog: test_data/seismic_catalogue.csv
+stations:
+  - HL.ATH
+  - HL.APR
+bbox: "37.5,22.5,39.0,24.0"
+channels: "HH?"
+start_offset: -30
+end_offset: 150
+output_format: "MSEED"
+node: "NOA"
+network_filter:
+  - HL
+threads: 8
+
+map_output_dir: "maps"
+image_formats:
+  - png
+  - pdf
+export_formats:
+  - geojson
+  - csv
+
+output_dir: "results"
+log: true
+```
+
+##  Graceful Exit
+Pressing Ctrl+C will safely stop execution and preserve intermediate results.
+
 
 ## 📥 Inputs
 
 * Output directory: Base output directory specified by the user in which the analysis results will be generated
-* `catalog.xml` or `catalog.xlsx,.xlsx,.csv,.txt`: A catalog containing seismic event metadata. !!! IMPORTANT !!! A catalog provided in .xls,.xlsx,.csv,.txt formats must has the extact same columns names as listed here:[Origin Time (GMT),	Latitude,	Longitude,	Depth (km),	Magnitude (ML)] for the succesfull completion of the dowload stage, like the example image below.
+
+* `catalog.xml` or `catalog.xlsx,.xlsx,.csv,.txt`: A path to a catalog containing seismic event metadata. !!! IMPORTANT !!! A catalog provided in .xls,.xlsx,.csv,.txt formats must has the extact same columns names as listed here:[Origin Time (GMT),	Latitude,	Longitude,	Depth (km),	Magnitude (ML)] for the succesfull completion of the dowload stage, like the example image below.
 ![Linear regression of F(t) example](<images/seismic_catalogue_example.png>)
 
-* Station codes (e.g. `ATH`) or search radius (e.g. `100` km)
+* Station codes (e.g. `ATH`) or search radius (e.g. `100` km) or Geographic coordinates Bounding Box (Lat/Lon limits: minlatitude, maxlatitude, minlongitude maxlongitude) (e.g `37.5,38.4,23.2,24.2`)
 
 ## 📤 Outputs
 
@@ -244,10 +405,13 @@ scodakit \
 * obspy
 * pandas
 * matplotlib
+* seaborn
 * scikit-learn
 * cartopy
 * geopandas
 * openpyxl
+* json
+* pyyaml
 
 ---
 
@@ -313,6 +477,8 @@ Contributions are welcomne! Feel free to:
 
 - matplotlib for plotting data
 
+- seaborn for advanced statistical data ploting
+
 - ObsPy for seismic waveform handling and processing
 
 - Cartopy for geospatial mapping
@@ -322,6 +488,8 @@ Contributions are welcomne! Feel free to:
 - FDSN providers like NOA and IRIS for seismic data aquisition
 
 - openpyxl for handling Excel files
+
+- json and yaml for handling configuration files
 
 - Research papers for providing the theoretical background. Here only the papers used for the methodology and the theoretical background description will be referenced:
 1. Aki K, Chouet B (1975) Origin of coda waves: Source, attenuation and scattering effects. J Geophys Res 80:3322–3342, DOI 10.1029/JB080i023p03322
