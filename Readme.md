@@ -254,7 +254,7 @@ scodakit -h
 
 ## Visual diagram of the pipeline stages
 
-```Mermaid
+```mermaid
 graph TD
   Start([Start])
   Start --> ParseArgs[/Parse CLI Arguments or Load Config/]
