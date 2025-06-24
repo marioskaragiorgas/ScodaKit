@@ -21,7 +21,6 @@ Inputs:
     - Output directories for coda segments, figures, and Excel summaries
 """
 
-import os
 import logging
 from pathlib import Path
 import pandas as pd
@@ -89,7 +88,15 @@ def extract_coda_window(
         Coda window stream, or None if invalid.
     """
     try:
-        st = read(stream_path)
+        stream_path = Path(stream_path)
+        if not stream_path.exists():
+            raise FileNotFoundError(f"Stream file {stream_path} does not exist.")
+        
+        coda_dir = Path(coda_dir)
+        if not coda_dir.exists():
+            coda_dir.mkdir(parents=True, exist_ok=True)
+
+        st = read(str(stream_path))
         if len(st) < 1:
             raise ValueError("No traces in stream.")
         tr = st[0]  # Use vertical component
@@ -109,7 +116,7 @@ def extract_coda_window(
             raise ValueError("Insufficient data in noise window.")
 
         rms_noise = rms(noise_data)
-        logging.info(f"[{stream_path}] RMS noise: {rms_noise}")
+        logging.info(f"[{stream_path.name}] RMS noise: {rms_noise}")
 
         signal_trace = tr.slice(starttime=tc, endtime=tr.stats.endtime)
         signal_data = signal_trace.data
@@ -127,16 +134,17 @@ def extract_coda_window(
 
             if snr <= snr_threshold:
                 coda_end_time = tc + i / fs
-                logging.info(f"[{stream_path}] Coda ends at {coda_end_time} (SNR={snr:.2f})")
+                logging.info(f"[{stream_path.name}] Coda ends at {coda_end_time} (SNR={snr:.2f})")
                 break
 
         coda_window = st.slice(starttime=tc, endtime=coda_end_time)
 
         # Save coda window to file
-        coda_window.write(os.path.join(coda_dir, os.path.basename(stream_path)), format='MSEED')
-        if not os.path.exists(coda_dir):
-            os.makedirs(coda_dir)
+        output_path = coda_dir / stream_path.name
+        coda_window.write(output_path, format='MSEED')
+        logging.info(f"Coda window saved to {output_path}")
 
+        # Debugging information
         if debug:
 
             logging.info(f"Coda start: {tc}, end: {coda_end_time}, duration: {coda_end_time - tc} seconds")
@@ -150,7 +158,7 @@ def extract_coda_window(
             time_axis = np.arange(0, len(snr_values)) / fs
             plt.plot(time_axis, snr_values)
             plt.axhline(y=snr_threshold, color='r', linestyle='--', label='SNR Threshold')
-            plt.title(f"SNR Curve for {os.path.basename(stream_path)}")
+            plt.title(f"SNR Curve for {stream_path.name}")
             plt.xlabel("Time after Tc (s)")
             plt.ylabel("SNR")
             plt.legend()
@@ -165,7 +173,7 @@ def extract_coda_window(
             plt.axvline(x=(s_arrival - tr.stats.starttime), color='b', linestyle='--', label='S Arrival')
             plt.axvline(x=(tc - tr.stats.starttime), color='y', linestyle='--', label='Tc')
             plt.axvline(x=(coda_end_time - tr.stats.starttime), color='r', linestyle='--', label='Coda End')
-            plt.title(f"Waveform with Arrival Times for {os.path.basename(stream_path)}")
+            plt.title(f"Waveform with Arrival Times for {stream_path.name}")
             plt.xlabel("Time (s)")
             plt.ylabel("Amplitude")
             plt.legend()
@@ -181,7 +189,7 @@ def extract_coda_window(
             return None
 
     except Exception as e:
-        logging.error(f"Error extracting coda window from {stream_path}: {e}")
+        logging.error(f"Error extracting coda window from {stream_path.name}: {e}")
         return None
 
 def compute_energy_decay(coda, origin_time, s_delay, r_km, w_erg):
@@ -250,27 +258,37 @@ def process_event_batch(
     
     """
     try:
+        
+        data_catalog = Path(data_catalog)
+        waveform_dir = Path(waveform_dir)
+        output_dir = Path(output_dir)
+        coda_dir = output_dir / "coda_segments"
+
         df_phases = pd.read_excel(data_catalog)
         logging.info(f"Loaded {len(df_phases)} events from {data_catalog}")
-        logging.info(f"Processing {len([f for f in Path(waveform_dir).iterdir() if f.is_file()])} validated waveforms from {waveform_dir}")
-        if not os.path.exists(waveform_dir):
+        logging.info(f"Processing {len([f for f in waveform_dir.iterdir() if f.is_file()])} validated waveforms from {waveform_dir}")
+        
+        if not waveform_dir.exists():
             logging.error(f"Waveform directory {waveform_dir} does not exist.")
             return None
-        if not os.path.exists(data_catalog):
+        
+        if not data_catalog.exists():
             logging.error(f"Data catalog {data_catalog} does not exist.")
             return None
-        if not os.path.exists(output_dir):
+        
+        if not output_dir.exists():
             logging.error(f"Output directory {output_dir} does not exist. Attempting to create it.")
-            os.makedirs(output_dir)
+            output_dir.mkdir(parents=True)
+        
+        if not coda_dir.exists():
+            logging.info(f"Creating coda directory: {coda_dir}")
+            coda_dir.mkdir(parents=True)
+
         # Display the df_phases DataFrame
         logging.info(f"Data catalog:\n{df_phases.head()}")
-        
-        # Create coda directory if it doesn't exist
-        if not os.path.exists(os.path.join(output_dir, "coda_segments")):
-            os.makedirs(os.path.join(output_dir, "coda_segments"))
-        coda_dir = os.path.join(output_dir, "coda_segments")
-        logging.info(f"Creating coda directory: {coda_dir}")
-        results = {'Origin Time': [], 'Magnitude (ML)': [], 'S-wave Radiated Energy (erg)': [],
+
+        # Initialize results dictionary
+        results = {'Origin Time': [], 'Station': [], 'Magnitude (ML)': [], 'S-wave Radiated Energy (erg)': [],
                    'Hypocentral Distance (km)': [], 'log10l': [], 'B': [], 'R²': [], 'Mean Free Path (cm)': []}
 
         for i, row in df_phases.iterrows():
@@ -289,10 +307,10 @@ def process_event_batch(
             tsp = s_arr - p_arr
 
             fname = f"{origin.strftime('%Y-%m-%d-%H-%M-%S')}_{row['Network']}_{row['Station']}.mseed"
-            fpath = os.path.join(waveform_dir, fname)
+            fpath = waveform_dir / fname
             
             logging.info(f"Processing {i}/{len(df_phases)} waveform: {fpath}")
-            if not os.path.exists(fpath):
+            if not fpath.exists():
                 logging.warning(f"File {fpath} does not exist. Skipping.")
                 continue
             
@@ -317,6 +335,7 @@ def process_event_batch(
             Y_pred = model.predict(X)
             r2 = r2_score(Y, Y_pred)
             results['Origin Time'].append(origin)
+            results['Station'].append(row['Station'])
             results['Magnitude (ML)'].append(m)
             results['S-wave Radiated Energy (erg)'].append(w)
             results['Hypocentral Distance (km)'].append(r)
@@ -338,12 +357,12 @@ def process_event_batch(
             ax.set_xlabel("Lapse Time t (s)")
             ax.set_ylabel("F(t)")
             plt.tight_layout()
-            fig_path = os.path.join(output_dir, f"{origin.strftime('%Y%m%d_%H%M%S')}_Ft_fit.png")
-            fig.savefig(fig_path, dpi=200)
+            fig_path = output_dir / f"{origin.strftime('%Y%m%d_%H%M%S')}__{row['Network']}_{row['Station']}_Ft_fit.png"
+            fig.savefig(fig_path, dpi=300)
             plt.close()
         
         df_out = pd.DataFrame(results)
-        path = os.path.join(output_dir, "scattering_par_summary.xlsx")
+        path = output_dir / "scattering_par_summary.xlsx"
         df_out.to_excel(path, index=False)
         logging.info(f"Processing complete. S-coda scattering parametres summary saved to {path}")
     except Exception as e:
