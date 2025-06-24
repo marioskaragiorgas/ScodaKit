@@ -17,7 +17,9 @@ dependencies = [
     'scikit-learn',
     'cartopy',
     'geopandas',
-    'openpyxl'
+    'openpyxl',
+    'json',
+    'pyyaml'
 ]
 
 license = { file = "License.md" }
