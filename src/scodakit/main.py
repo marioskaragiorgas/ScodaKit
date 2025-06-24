@@ -185,7 +185,7 @@ def main():
                 logging.error(f"Unsupported config file format: {config_path.suffix}. Supported formats are .json and .yaml")
 
         # If dry_run is set, validate arguments and exit
-        if args.dry_run or args.dr:
+        if args.dry_run:
             logging.info("Dry run mode enabled. Validating arguments and configuration without executing pipeline stages.")
             logging.info(f"Pipeline arguments:\n{json.dumps(vars(args), indent=2)}") 
             sys.exit(0)
@@ -199,7 +199,6 @@ def main():
             args.process = True
             args.plot = True
 
-        print(vars(args))  # Print all arguments for debugging
         # Validate and process output directory
         if not args.output_dir:
             logging.error("Output directory must be specified using --output_dir")
