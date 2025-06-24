@@ -17,7 +17,7 @@ from obspy.clients.fdsn import Client
 from obspy.geodetics import locations2degrees, degrees2kilometers
 from scodakit.download import detect_delimiter
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
 def prepare_catalog_for_mfp(picks_excel: str, seismic_catalog: str, output_excel: str, client: str = "NOA"):
     """
