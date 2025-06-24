@@ -16,6 +16,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.io.img_tiles import GoogleTiles
 
+logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
 def load_data(catalogue_path):
     catalogue = pd.read_excel(catalogue_path)
