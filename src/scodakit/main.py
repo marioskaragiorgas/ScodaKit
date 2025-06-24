@@ -66,7 +66,7 @@ def setup_logging(output_dir: Path, log_to_file: bool = True):
     
     # Console formatter: just the message
     console_handler = logging.StreamHandler(sys.stdout)
-    #console_handler.setFormatter(logging.Formatter('%(levelname)s- %(message)s'))
+    console_handler.setFormatter(logging.Formatter('%(levelname)s- %(message)s'))
 
     logging.basicConfig(
         level=logging.INFO,
@@ -80,7 +80,8 @@ def setup_logging(output_dir: Path, log_to_file: bool = True):
 
         # Add file handler to logging module
         file_handler = logging.FileHandler(log_file, mode='a', encoding="utf-8")
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        # Only level and message, no acttime
+        file_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
         logging.getLogger().addHandler(file_handler)
 
         logging.info("Logging to file enabled.")
