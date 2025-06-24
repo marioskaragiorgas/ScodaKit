@@ -233,7 +233,7 @@ scodakit -h
 
 ---
 
-## Map Generation
+## Map Generation Options
 
 | Argument            | Description                                                |
 |---------------------|------------------------------------------------------------|
