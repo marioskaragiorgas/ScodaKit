@@ -20,7 +20,7 @@ from matplotlib.widgets import SpanSelector
 from obspy import read
 from scodakit.utils import Filters
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
 def pick_phases_from_folder(
     input_folder: str, 
