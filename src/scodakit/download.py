@@ -18,7 +18,7 @@ import pandas as pd
 from typing import List, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
 def detect_delimiter(filepath):
     """
