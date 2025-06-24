@@ -410,7 +410,6 @@ Pressing Ctrl+C will safely stop execution and preserve intermediate results.
 * cartopy
 * geopandas
 * openpyxl
-* json
 * pyyaml
 
 ---
