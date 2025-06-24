@@ -17,7 +17,6 @@ Output:
 - PNG plots for full traces and codas with annotations and time-frequency analysis.
 """
 
-import os
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -34,48 +33,13 @@ def plot_trace_with_annotations(tr, p_time, s_time, origin_time, tc , coda_endti
     ax.axvline((tc - origin_time), linestyle="--", color="k", label='Coda start')
     ax.axvline((coda_endtime - origin_time), linestyle="--", color="g", label='Coda end')
     #ax.axvline(0, linestyle="--", color="k", label='Origin')
-    ax.set_ylabel("Amplitude (m/s)")
+    ax.set_ylabel("Amplitude")
     ax.legend(loc='upper right', fontsize=8)
     ax.grid(True)
-
-def trace_spectrogram(trace, fs, window_duration=0.1, overlap=0.5, scaling='density', log_scale=False):
-    """
-    Compute the spectrogram of a seismic trace using short-time Fourier transform (STFT).
-    
-    Parameters:
-        trace (ndarray): The seismic trace to analyze.
-        fs (float): The sampling frequency of the trace.
-        window_duration (float): Duration of the STFT window in seconds (default: 0.1).
-        overlap (float): Fraction of overlap between windows (default: 0.5).
-        scaling (str): Scaling of the spectrogram ('density' or 'spectrum').
-        log_scale (bool): Whether to return the spectrogram in log scale (default: False).
-    
-    Returns:
-        tuple:
-            - f (ndarray): Array of sample frequencies [Hz].
-            - t (ndarray): Array of time segments [s].
-            - Sxx (ndarray): Spectrogram of the trace.
-    """
-    # Define the window length and overlap
-    window_length = int(window_duration * fs)
-    window = np.hanning(window_length)
-    noverlap = int(window_length * overlap)
-    nfft = max(256, 2 ** int(np.ceil(np.log2(window_length))))  # Power of 2 for FFT length
-
-    # Compute the spectrogram
-    f, t, Sxx = spectrogram(trace, fs, window=window, noverlap=noverlap, nfft=nfft, scaling=scaling)
-
-    # Optionally convert to logarithmic scale
-    if log_scale:
-        Sxx = 10 * np.log10(Sxx + 1e-12)  # Add small value to avoid log(0)
-
-    return f, t, Sxx
 
 def plot_spectrogram(tr, ax):
     tr.spectrogram(log=False, axes=ax, wlen=int(0.1 * tr.stats.sampling_rate), cmap='nipy_spectral', show=False, samp_rate =tr.stats.sampling_rate, dbscale = True)
     fs = tr.stats.sampling_rate
-    #f, t, Sxx = trace_spectrogram(tr.data, fs, window_duration=0.1, overlap=0.5, scaling='density', log_scale=False)
-    #ax.pcolormesh(t, f, 10 * np.log10(Sxx), shading='gouraud', cmap='jet')
     ax.set_ylabel("Frequency (Hz)")
     ax.set_xlabel("Time (s)")
     ax.grid(True)
@@ -95,7 +59,7 @@ def plot_waveform_and_spectrogram(
     axs[3].set_title("Spectrogram (Vertical Component)")
     plt.tight_layout()
     fname = f"{origin_time.strftime('%Y%m%dT%H%M%S')}_{st[0].stats.station}_full.png"
-    fig.savefig(Path(out_dir) / fname, dpi=200)
+    fig.savefig(Path(out_dir) / fname, dpi=300)
     plt.close(fig)
 
 def plot_coda_with_spectrogram(mseed_file, origin_time, out_dir):
@@ -119,7 +83,7 @@ def plot_coda_with_spectrogram(mseed_file, origin_time, out_dir):
     #axs[3].set_title("Spectrogram (Vertical Component)")
     plt.tight_layout()
     fname = f"{origin_time.strftime('%Y%m%dT%H%M%S')}_{st[0].stats.station}_coda.png"
-    fig.savefig(Path(out_dir) / fname, dpi=200)
+    fig.savefig(Path(out_dir) / fname, dpi=300)
     plt.close(fig)
 
 def plot_all(
@@ -172,5 +136,3 @@ def plot_all(
             plot_waveform_and_spectrogram(full_path, origin, p_arr, s_arr, tc, coda_endtime, output_full_dir)
         if coda_path.exists():
             plot_coda_with_spectrogram(coda_path, origin, output_coda_dir)
-    
-    
