@@ -24,7 +24,8 @@ import logging
 import sys
 import time
 from pathlib import Path
-
+import json
+import yaml
 
 from scodakit.download import download_waveforms
 from scodakit.picking import pick_phases_from_folder
@@ -34,7 +35,7 @@ from scodakit.process import process_event_batch
 from scodakit.plots import plot_all
 
 # Check python version compatibility
-if sys.version_info.major < 3 or sys.version_info.minor < 8:
+if sys.version_info.major < 3 or sys.version_info.minor < 7:
     print("Python version 3.7 or higher is required.")
     print(f"Current version: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
     print("Please update your Python version.")
@@ -65,7 +66,7 @@ def setup_logging(output_dir: Path, log_to_file: bool = True):
     
     # Console formatter: just the message
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(logging.Formatter('%(levelname)s- %(message)s'))
+    #console_handler.setFormatter(logging.Formatter('%(levelname)s- %(message)s'))
 
     logging.basicConfig(
         level=logging.INFO,
@@ -96,6 +97,9 @@ def check_dependencies():
         import cartopy
         import cartopy.crs as ccrs
         import cartopy.feature as cfeature
+        import json
+        import yaml
+
     except ImportError as e:
         logging.error(f"Missing dependency: {e.name}. Install it using pip.")
         return False
@@ -112,151 +116,221 @@ def log_stage_complete(start_time, stage_name):
 def main():
     pipeline_start = time.time()
     parser = argparse.ArgumentParser(
-        description="Scodakit" \
-        "A scientific Python-based command line toolkit for S-coda seismic wave analysis and scattering parameters estimation",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description="Scodakit: A scientific Python-based command line toolkit for S-coda seismic wave analysis and scattering parameters estimation",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        epilog= "For more information, please visit https://github.com/marioskaragiorgas/ScodaKit#readme"
     )
 
+    try:
 
-    # Pipeline stages
-    parser.add_argument('--download', action='store_true', help="Download waveforms from FDSN")
-    parser.add_argument('--pick', action='store_true', help="Manually pick P and S arrivals")
-    parser.add_argument('--merge_catalog', action='store_true', help="Merge picks with seismic metadata")
-    parser.add_argument('--map', action='store_true', help="Create GIS-compatible maps and export event/station data")
-    parser.add_argument('--process', action='store_true', help="Extract S-coda and compute mean free path")
-    parser.add_argument('--plot', action='store_true', help="Plot waveforms")
-    parser.add_argument('--analyze', action='store_true', help="Run post-analysis")
 
-    # Downloading options
-    parser.add_argument('--catalog', type=str, help="Seismic event catalog file (.xml, .csv, .xlsx)")
-    parser.add_argument('--stations', nargs='+', default=None, help="Station codes (e.g., ['ATH'], ['KAL', 'KAL2']) or a single station code as a string (e.g., 'ATH')")
-    parser.add_argument('--radius', type=float, default=None, help="Search radius in km")
-    parser.add_argument('--channels', type=str, default="HH?", help="SEED channel pattern (e.g., HH?)")
-    parser.add_argument('--start_offset', type=int, default=-30, help="Seconds before origin")
-    parser.add_argument('--end_offset', type=int, default=150, help="Seconds after origin")
-    parser.add_argument('--output_format', type=str, default="MSEED", help="Waveform format")
-    parser.add_argument('--node', type=str, default="NOA", help="FDSN data node")
-    parser.add_argument('--network_filter', nargs='+', default=["HL"], help="Allowed network codes")
+        # Pipeline stages
+        stages = parser.add_argument_group("Pipeline Stages")
+        stages.add_argument('-dr', '--dry_run', action='store_true', help="Dry run mode. Validate arguments and configuration without executing pipeline stages")
+        stages.add_argument('-a', '--all', action='store_true', help="Run all stages of the pipeline")
+        stages.add_argument('-d', '--download', action='store_true', help="Download waveforms from FDSN")
+        stages.add_argument('-p', '--pick', action='store_true', help="Manually pick P and S arrivals")
+        stages.add_argument('-me', '--merge_catalog', action='store_true', help="Merge picks with seismic metadata")
+        stages.add_argument('-ma', '--map', action='store_true', help="Create GIS-compatible maps and export event/station data")
+        stages.add_argument('-pr', '--process', action='store_true', help="Extract S-coda and compute mean free path")
+        stages.add_argument('-pl', '--plot', action='store_true', help="Plot waveforms")
 
-    # Map Generation options
-    parser.add_argument('--map_output_dir', type=str, default="maps", help="Output directory for maps. Will be created if it doesn't exist.")
-    parser.add_argument('--image_formats', nargs='+', default=["png", "pdf"], help="Image formats for map output")
-    parser.add_argument('--export_formats', nargs='+', default=["geojson", "csv"], help="Export formats for map data (e.g., geojson, csv, shapefile)")
+        # Downloading options
+        download_group = parser.add_argument_group("Download Options")
+        download_group.add_argument('--catalog', type=str, help="Seismic event catalog file (.xml, .csv, .xlsx)")
+        download_group.add_argument('--stations', nargs='+', default=None, help="Station codes or a single station code as a string. A station code conatins the network code and the station name (e.g., 'HL.ATH')")
+        download_group.add_argument('--bbox', type= str, default=None, help="Bounding Box (Lat/Lon limits). A rectangular area using minlatitude, maxlatitude, minlongitude, and maxlongitude in the format: 'minlat,minlon,maxlat,maxlon'.")
+        download_group.add_argument('--radius', type=float, default=None, help="Radius in kilometers to search for stations. If not set, station_list or bounding box must be provided.")
+        download_group.add_argument('--channels',  type=str, default="HH?", help="SEED channel pattern (e.g., HH?)")
+        download_group.add_argument('--start_offset', type=int, default=-30, help="Seconds before origin")
+        download_group.add_argument('--end_offset', type=int, default=150, help="Seconds after origin")
+        download_group.add_argument('--output_format', type=str, default="MSEED", help="Waveform format")
+        download_group.add_argument('--node', type=str, default="NOA", help="FDSN data node. Available nodes can be found in obspy.clients.fdsn.header.URL_MAPPINGS.")
+        download_group.add_argument('--network_filter', nargs='+', default=["*"], help="Allowed network codes")
+        download_group.add_argument('--threads', type=int, default=1, help="Number of CPU threads to use for downloading waveforms. Default is 1 (single-threaded).")
 
-    # General
-    parser.add_argument('--output_dir', type=str, default=None, help="Base output directory containing the results specified by the user. Will be created if it doesn't exist.")
-    parser.add_argument('--log_to_file', action='store_true', help="Also write logs to pipeline.log")
+        # Map Generation options
+        map_group = parser.add_argument_group("Map Generation Options")
+        map_group.add_argument('--map_output_dir', type=str, default="maps", help="Output directory for maps. Will be created if it doesn't exist.")
+        map_group.add_argument('--image_formats', nargs='+', choices= ["png", "pdf"], default=["png", "pdf"], help="Image formats for map output")
+        map_group.add_argument('--export_formats', nargs='+', choices=["geojson", "csv"], default=["geojson", "csv"], help="Export formats for map data (e.g., geojson, csv, shapefile)")
 
-    args = parser.parse_args()
+        # General
+        general_group = parser.add_argument_group("General Options")
+        general_group.add_argument('--output_dir', type=str, default=None, help="Base output directory containing the results specified by the user. Will be created if it doesn't exist.")
+        general_group.add_argument('--log', action='store_true', help="Also write logs to pipeline.log")
+        general_group.add_argument('--config', type=str, default=None, help="Path to config file (.json or .yaml). If provided, it will override command line arguments.")
 
-    # Validate and process output directory
-    if not args.output_dir:
-        logging.error("Output directory must be specified using --output_dir")
+        args = parser.parse_args()
+        
+        # If a config file is provided, load it and update args
+        if args.config:
+            config_path = Path(args.config)
+            if not config_path.exists():
+                logging.error(f"Config file not found: {args.config}")
+                sys.exit(1)
+            if config_path.suffix in ['.json', '.yaml', '.yml']:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    if config_path.suffix == '.json':
+                        config_data = json.load(f)
+                    else:
+                        config_data = yaml.safe_load(f)
+                # Update args with config data
+                for key, value in config_data.items():
+                    if hasattr(args, key):
+                        setattr(args, key, value)
+                    else:
+                        logging.warning(f"Config key '{key}' not recognized. Skipping.")
+            else:
+                logging.error(f"Unsupported config file format: {config_path.suffix}. Supported formats are .json and .yaml")
+
+        # If dry_run is set, validate arguments and exit
+        if args.dry_run or args.dr:
+            logging.info("Dry run mode enabled. Validating arguments and configuration without executing pipeline stages.")
+            logging.info(f"Pipeline arguments:\n{json.dumps(vars(args), indent=2)}") 
+            sys.exit(0)
+
+        # If -a or --all is set, enable all stages
+        if args.all or args.a:
+            args.download = True
+            args.pick = True
+            args.merge_catalog = True
+            args.map = True
+            args.process = True
+            args.plot = True
+
+        print(vars(args))  # Print all arguments for debugging
+        # Validate and process output directory
+        if not args.output_dir:
+            logging.error("Output directory must be specified using --output_dir")
+            sys.exit(1)
+        
+        output_dir = Path(args.output_dir) / 'results'
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+        setup_logging(output_dir, args.log)
+
+        logging.info("S-coda Mean Free Path Pipeline started.")
+        logging.info(f"Working directory: {output_dir}")
+        logging.info(f"User arguments: {args}")
+
+        if not check_dependencies():
+            sys.exit(1)
+
+        if (args.download or args.merge_catalog) and not Path(args.catalog).exists():
+            logging.error(f"Catalog file not found: {args.catalog}")
+            sys.exit(1)
+
+        # STAGE 1: Download
+        if args.download:
+
+            if args.bbox:
+                try:
+                    minlat, minlon, maxlat, maxlon = map(float, args.bbox.split(','))
+                except ValueError:
+                    raise ValueError("Bounding box must have four comma-separated float values.")
+            else:
+                minlat, minlon, maxlat, maxlon = (None, None, None, None)
+
+            start = log_stage("Downloading Waveforms")
+            download_waveforms(
+                catalogue_path=args.catalog,
+                station_list=args.stations, #if not (len(args.stations) == 1 and args.stations[0].isdigit()) else None,
+                radius=args.radius,
+                bbox=[minlat, minlon, maxlat, maxlon],
+                channels=args.channels,
+                start_offset=args.start_offset,
+                end_offset=args.end_offset,
+                output_format=args.output_format,
+                node=args.node,
+                network_filter=args.network_filter,
+                destination=output_dir / "waveforms",
+                threads=args.threads
+            )
+            log_stage_complete(start, "Download")
+        else:
+            logging.info("Skipping download stage (-download not set)")
+
+        # STAGE 2: Pick Phases
+        if args.pick:
+            start = log_stage("Manual P/S Phase Picking")
+            pick_phases_from_folder(
+                input_folder=str(output_dir / "waveforms"),
+                output_excel=str(output_dir / "arrival_times.xlsx"),
+                output_waveform_folder=str(output_dir / "validated_waveforms")
+            )
+            log_stage_complete(start, "Picking")
+        else:
+            logging.info("Skipping picking stage (-pick not set)")
+
+        # STAGE 3: Merge Catalog
+        if args.merge_catalog:
+            start = log_stage("Merging Picks with Catalog")
+            prepare_catalog_for_mfp(
+                picks_excel=str(output_dir / "arrival_times.xlsx"),
+                seismic_catalog=args.catalog,
+                output_excel=str(output_dir / "merged_catalog.xlsx"),
+                client=args.node
+            )
+            log_stage_complete(start, "Merge Catalog")
+        else:
+            logging.info("Skipping merge_catalog stage (-merge_catalog not set)")
+
+        # STAGE 4: Generate Map
+        if args.map:
+            start = log_stage("Generating Map")
+            generate_map(
+                catalogue_path=str(output_dir / "merged_catalog.xlsx"),
+                output_dir=str(output_dir / args.map_output_dir),
+                image_formats=args.image_formats,
+                export_formats=args.export_formats
+            )
+            log_stage_complete(start, "Map Generation")
+        else:
+            logging.info("Skipping map generation stage (-map not set)")
+
+        # STAGE 5: Process
+        if args.process:
+            start = log_stage("S-Coda Mean Free Path Estimation")
+            process_event_batch(
+                data_catalog=str(output_dir / "merged_catalog.xlsx"),
+                waveform_dir=str(output_dir / "validated_waveforms"),
+                output_dir=str(output_dir / "processed_output")
+            )
+            log_stage_complete(start, "Processing")
+        else:
+            logging.info("Skipping processing stage (-process not set)")
+
+        # STAGE 6: Plot
+        if args.plot:
+            start = log_stage("Plotting")
+            plot_all(
+                arrival_excel=str(output_dir / "arrival_times.xlsx"),
+                validated_waveforms_dir=str(output_dir / "validated_waveforms"),
+                coda_waveforms_dir=str(output_dir / "processed_output" / "coda_segments"),
+                output_full_dir=str(output_dir / "plots/full_waveforms"),
+                output_coda_dir=str(output_dir / "plots/coda_waveforms")
+            )
+            log_stage_complete(start, "Plotting")
+        else:
+            logging.info("Skipping plotting stage (-plot not set)")
+
+        logging.info("Pipeline execution complete. All selected stages finished.")
+        logging.info(f"Total execution time: {time.time() - pipeline_start:.1f} seconds.")
+        logging.info("Exiting pipeline.")
+    
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        logging.error("Pipeline execution failed.")
         sys.exit(1)
-     
-    output_dir = Path(args.output_dir / 'results')
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-    setup_logging(output_dir, args.log_to_file)
-
-    logging.info("S-coda Mean Free Path Pipeline started.")
-    logging.info(f"Working directory: {output_dir}")
-    logging.info(f"User arguments: {args}")
-
-    if not check_dependencies():
-        sys.exit(1)
-
-    if (args.download or args.merge_catalog) and not Path(args.catalog).exists():
-        logging.error(f"Catalog file not found: {args.catalog}")
-        sys.exit(1)
-
-    # STAGE 1: Download
-    if args.download:
-        start = log_stage("Downloading Waveforms")
-        download_waveforms(
-            catalogue_path=args.catalog,
-            station_list=args.stations, #if not (len(args.stations) == 1 and args.stations[0].isdigit()) else None,
-            radius=args.radius,
-            channels=args.channels,
-            start_offset=args.start_offset,
-            end_offset=args.end_offset,
-            output_format=args.output_format,
-            node=args.node,
-            network_filter=args.network_filter,
-            destination=output_dir / "waveforms"
-        )
-        log_stage_complete(start, "Download")
-    else:
-        logging.info("Skipping download stage (--download not set)")
-
-    # STAGE 2: Pick Phases
-    if args.pick:
-        start = log_stage("Manual P/S Phase Picking")
-        pick_phases_from_folder(
-            input_folder=str(output_dir / "waveforms"),
-            output_excel=str(output_dir / "arrival_times.xlsx"),
-            output_waveform_folder=str(output_dir / "validated_waveforms")
-        )
-        log_stage_complete(start, "Picking")
-    else:
-        logging.info("Skipping picking stage (--pick not set)")
-
-    # STAGE 3: Merge Catalog
-    if args.merge_catalog:
-        start = log_stage("Merging Picks with Catalog")
-        prepare_catalog_for_mfp(
-            picks_excel=str(output_dir / "arrival_times.xlsx"),
-            seismic_catalog=args.catalog,
-            output_excel=str(output_dir / "merged_catalog.xlsx"),
-            client=args.node
-        )
-        log_stage_complete(start, "Merge Catalog")
-    else:
-        logging.info("Skipping merge_catalog stage (--merge_catalog not set)")
-
-    # STAGE 4: Generate Map
-    if args.map:
-        start = log_stage("Generating Map")
-        generate_map(
-            catalogue_path=str(output_dir / "merged_catalog.xlsx"),
-            output_dir=str(output_dir / args.map_output_dir),
-            image_formats=args.image_formats,
-            export_formats=args.export_formats
-        )
-        log_stage_complete(start, "Map Generation")
-    else:
-        logging.info("Skipping map generation stage (--map not set)")
-
-    # STAGE 5: Process
-    if args.process:
-        start = log_stage("S-Coda Mean Free Path Estimation")
-        process_event_batch(
-            data_catalog=str(output_dir / "merged_catalog.xlsx"),
-            waveform_dir=str(output_dir / "validated_waveforms"),
-            output_dir=str(output_dir / "processed_output")
-        )
-        log_stage_complete(start, "Processing")
-    else:
-        logging.info("Skipping processing stage (--process not set)")
-
-    # STAGE 6: Plot
-    if args.plot:
-        start = log_stage("Plotting")
-        plot_all(
-            arrival_excel=str(output_dir / "arrival_times.xlsx"),
-            validated_waveforms_dir=str(output_dir / "validated_waveforms"),
-            coda_waveforms_dir=str(output_dir / "processed_output" / "coda_segments"),
-            output_full_dir=str(output_dir / "plots/full_waveforms"),
-            output_coda_dir=str(output_dir / "plots/coda_waveforms")
-        )
-        log_stage_complete(start, "Plotting")
-    else:
-        logging.info("Skipping plotting stage (--plot not set)")
-
-    logging.info("Pipeline execution complete. All selected stages finished.")
-    logging.info(f"Total execution time: {time.time() - pipeline_start:.1f} seconds.")
-    logging.info("Exiting pipeline.")
+    
+    except KeyboardInterrupt:
+        logging.warning("Pipeline execution interrupted by user.")
+        # Save partial results if needed and clean up
+        
+        logging.info("Exiting pipeline.")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
