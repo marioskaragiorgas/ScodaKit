@@ -33,7 +33,7 @@ def plot_trace_with_annotations(tr, p_time, s_time, origin_time, tc , coda_endti
     ax.axvline((tc - origin_time), linestyle="--", color="k", label='Coda start')
     ax.axvline((coda_endtime - origin_time), linestyle="--", color="g", label='Coda end')
     #ax.axvline(0, linestyle="--", color="k", label='Origin')
-    ax.set_ylabel("Amplitude")
+    ax.set_ylabel("Amplitude (m/s)")
     ax.legend(loc='upper right', fontsize=8)
     ax.grid(True)
 
