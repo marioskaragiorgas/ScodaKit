@@ -60,17 +60,26 @@ def plot_map(events_gdf, stations_gdf, output_dir, image_formats):
     tiles = GoogleTiles(style="satellite")
     fig, ax = plt.subplots(figsize=(12, 12), subplot_kw={'projection': ccrs.PlateCarree()})
     ax.add_image(tiles, 10, interpolation='bilinear')
-    ax.set_title("Seismic Events and Stations")
+    ax.set_title("Earthquake Epicentres and Stations")
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    ax.gridlines(draw_labels=True)
+    gl = ax.gridlines(draw_labels=True, linewidth=2.0, color='gray', alpha=0.5, linestyle='--') 
+    gl.top_labels = False
+    gl.right_labels = False
+ 
+    stations_gdf.plot(ax=ax, marker="^", color="magenta", markersize=100, label="Stations", edgecolor="black", zorder=5)
+    events_gdf.plot(ax=ax, marker="*", column ="Magnitude (ML)", cmap ='YlOrRd', alpha=1, legend=False, label="Seismic Epicentres", zorder=4, markersize=events_gdf["Magnitude (ML)"] ** 4)
+
+    # add a label to the colour bar
+    sm = plt.cm.ScalarMappable(norm=plt.Normalize(vmin=events_gdf["Magnitude (ML)"].min(), vmax=events_gdf["Magnitude (ML)"].max()), cmap= 'YlOrRd')
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax, orientation='vertical', pad=0.02)
+    cbar.set_label("Magnitude (ML)", rotation=270, labelpad=30)
     
-    stations_gdf.plot(ax=ax, marker="^", color="blue", markersize=60, label="Stations", edgecolor="black", zorder=5)
-    events_gdf.plot(ax=ax, marker="o", column="Magnitude (ML)", cmap="Reds", alpha=0.7, legend=True, label="Events", zorder=4)
 
     # Add labels for stations
     for _, row in stations_gdf.iterrows():
-        ax.text(row.geometry.x + 0.05, row.geometry.y + 0.05, row["Station"], fontsize=8, color="blue")
+        ax.text(row.geometry.x + 0.01, row.geometry.y + 0.01, row["Station"], fontsize=10, color="magenta")
 
     ax.legend()
     for fmt in image_formats:
@@ -89,8 +98,8 @@ def export_data(events_gdf, stations_gdf, output_dir, formats):
             events_gdf.drop(columns="geometry").to_csv(Path(output_dir) / "events.csv", index=False)
             stations_gdf.drop(columns="geometry").to_csv(Path(output_dir) / "stations.csv", index=False)
         elif fmt == "shp":
-            events_gdf.to_file(Path(output_dir) / "events.shp")
-            stations_gdf.to_file(Path(output_dir) / "stations.shp")
+            events_gdf.to_file(Path(output_dir) / "events.shp", driver="ESRI Shapefile")
+            stations_gdf.to_file(Path(output_dir) / "stations.shp", driver="ESRI Shapefile")
         logging.info(f"Exported GIS data as {fmt}")
 
 
