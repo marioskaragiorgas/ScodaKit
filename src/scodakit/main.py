@@ -35,8 +35,8 @@ from scodakit.process import process_event_batch
 from scodakit.plots import plot_all
 
 # Check python version compatibility
-if sys.version_info.major < 3 or sys.version_info.minor < 7:
-    print("Python version 3.7 or higher is required.")
+if sys.version_info.major < 3 or sys.version_info.minor < 8:
+    print("Python version 3.8 or higher is required.")
     print(f"Current version: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
     print("Please update your Python version.")
     print("Exiting...")
@@ -138,27 +138,28 @@ def main():
 
         # Downloading options
         download_group = parser.add_argument_group("Download Options")
-        download_group.add_argument('--catalog', type=str, help="Seismic event catalog file (.xml, .csv, .xlsx)")
-        download_group.add_argument('--stations', nargs='+', default=None, help="Station codes or a single station code as a string. A station code conatins the network code and the station name (e.g., 'HL.ATH')")
-        download_group.add_argument('--bbox', type= str, default=None, help="Bounding Box (Lat/Lon limits). A rectangular area using minlatitude, maxlatitude, minlongitude, and maxlongitude in the format: 'minlat,minlon,maxlat,maxlon'.")
-        download_group.add_argument('--radius', type=float, default=None, help="Radius in kilometers to search for stations. If not set, station_list or bounding box must be provided.")
-        download_group.add_argument('--channels',  type=str, default="HH?", help="SEED channel pattern (e.g., HH?)")
-        download_group.add_argument('--start_offset', type=int, default=-30, help="Seconds before origin")
-        download_group.add_argument('--end_offset', type=int, default=150, help="Seconds after origin")
-        download_group.add_argument('--output_format', type=str, default="MSEED", help="Waveform format")
-        download_group.add_argument('--node', type=str, default="NOA", help="FDSN data node. Available nodes can be found in obspy.clients.fdsn.header.URL_MAPPINGS.")
-        download_group.add_argument('--network_filter', nargs='+', default=["*"], help="Allowed network codes")
-        download_group.add_argument('--threads', type=int, default=1, help="Number of CPU threads to use for downloading waveforms. Default is 1 (single-threaded).")
+        
+        download_group.add_argument('--catalog', type=str, help="Seismic event catalog file (.xml, .csv, .xlsx). If not provided, the pipeline will not download waveforms and the pipeline will not run.")
+        download_group.add_argument('--stations', nargs='+', default=None, help="Station codes or a single station code as a string. A station code conatins the network code and the station name (e.g., 'HL.ATH' or 'HL.ATH','HA.ATHU'). If a single station code is provided, it will be used to download waveforms for that station only. If multiple stations are provided, they will be used to download waveforms for all specified stations.")
+        download_group.add_argument('--bbox', type= str, default=None, help="Bounding Box (Lat/Lon limits). A rectangular area to search for available stations using minlatitude, maxlatitude, minlongitude, and maxlongitude in the format: 'minlat,minlon,maxlat,maxlon'.")
+        download_group.add_argument('--radius', type=float, default=None, help="Radius in kilometers to search for stations. If not set, station_list or bounding box must be provided.") 
+        download_group.add_argument('--channels',  type=str, default="HH?", help="SEED channel pattern (e.g., HH?). Default is 'HH?'. Use '?' as a wildcard for any character. If not set, all channels will be downloaded.")  
+        download_group.add_argument('--start_offset', type=int, default=-30, help="Seconds before origin. Default is -30 seconds. Note that this is the total length of the waveform, not the start time relative to the origin.")
+        download_group.add_argument('--end_offset', type=int, default=150, help="Seconds after origin. Default is 150 seconds. Note that this is the total length of the waveform, not the end time relative to the origin.")        
+        download_group.add_argument('--output_format', type=str, default="MSEED", help="Waveform format. Options: MSEED, SAC, WAV. Default is MSEED. Note that SAC and SEGY formats are not supported by FDSN web services.")        
+        download_group.add_argument('--node', type=str, default="NOA", help="FDSN data node. Available nodes can be found in obspy.clients.fdsn.header.URL_MAPPINGS.")       
+        download_group.add_argument('--network_filter', nargs='+', default=["*"], help="Allowed network codes. Use '*' for all networks. Multiple networks can be specified as a list (e.g., --network_filter 'HL','GR')")
+        download_group.add_argument('--threads', type=int, default=1, help="Number of CPU threads to use for parallel downloading of waveforms. Default is 1 (single-threaded).")
 
         # Map Generation options
         map_group = parser.add_argument_group("Map Generation Options")
         map_group.add_argument('--map_output_dir', type=str, default="maps", help="Output directory for maps. Will be created if it doesn't exist.")
         map_group.add_argument('--image_formats', nargs='+', choices= ["png", "pdf"], default=["png", "pdf"], help="Image formats for map output")
-        map_group.add_argument('--export_formats', nargs='+', choices=["geojson", "csv"], default=["geojson", "csv"], help="Export formats for map data (e.g., geojson, csv, shapefile)")
+        map_group.add_argument('--export_formats', nargs='+', choices=["geojson", "csv", "shp"], default=["geojson", "csv", "shp"], help="Export formats for map data (e.g., geojson, csv, shapefile)")
 
         # General
         general_group = parser.add_argument_group("General Options")
-        general_group.add_argument('--output_dir', type=str, default=None, help="Base output directory containing the results specified by the user. Will be created if it doesn't exist.")
+        general_group.add_argument('--output_dir', type=str, default=None, help="Base output directory containing the results specified by the user. Will be created if it doesn't exist. If not set, the pipeline will not run.")
         general_group.add_argument('--log', action='store_true', help="Also write logs to pipeline.log")
         general_group.add_argument('--config', type=str, default=None, help="Path to config file (.json or .yaml). If provided, it will override command line arguments.")
 
@@ -180,6 +181,7 @@ def main():
                 for key, value in config_data.items():
                     if hasattr(args, key):
                         setattr(args, key, value)
+                        print(f"Overriding argument '{key}' with value from config: {value}")
                     else:
                         logging.warning(f"Config key '{key}' not recognized. Skipping.")
             else:
@@ -192,7 +194,7 @@ def main():
             sys.exit(0)
 
         # If -a or --all is set, enable all stages
-        if args.all or args.a:
+        if args.all:
             args.download = True
             args.pick = True
             args.merge_catalog = True
