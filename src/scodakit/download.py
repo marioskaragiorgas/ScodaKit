@@ -303,4 +303,3 @@ def download_waveforms(
                 
                 except Exception as e:
                     logging.warning(f"Failed to write waveform for {code} at {event}: {e}")
-            
