@@ -17,7 +17,6 @@ This command-line pipeline allows you to:
 - 🧠 Extract **S-coda waveforms** from the seismic traces using signal to noise ratio (SNR) method
 - 📉 Analyze S-coda energy decay to estimate **mean free path (ℓ)** and **Coda attenuation factor (B)** using the Single Isotropic Scattering Model
 - 📊 Visualize full waveforms, spectrograms and coda windows 
-- 📉Analyze and visualize results statistically
 - 🧪 Modular stages via CLI for reproducible research
 
 ---
@@ -163,7 +162,7 @@ scodakit/
 
 # 📦 Installation
 
-## (Optional) create a python virtual environment. Python >=3.7 needs to be installed first in the system
+## (Optional) create a python virtual environment. Python >=3.9 needs to be installed first in the system
 
 ```bash
 python -m venv venv
@@ -316,6 +315,7 @@ scodakit --config "path/to/your/config.json"
 ```
 The configuration file should look like this example:
 
+JSON format:
 ```json
 {
   "all": false,
@@ -343,6 +343,7 @@ The configuration file should look like this example:
 }
 ```
 
+YAML format
 ```yaml
 all: false
 download: true
